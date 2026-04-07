@@ -5,7 +5,7 @@ import os
 
 # 1. PAGE SETUP
 st.set_page_config(
-    page_title="Match Day Predictor",
+    page_title="Match Day Predictor Pro",
     page_icon="⚽",
     layout="centered"
 )
@@ -14,7 +14,7 @@ st.set_page_config(
 @st.cache_resource
 def load_assets():
     try:
-        # Loading directly from root folder (based on your Image 6)
+        # Loading directly from root folder
         model = joblib.load("football_model.pkl")
         encoder = joblib.load("club-encoder.pkl")
         name_map = joblib.load("name_map.pkl")
@@ -25,9 +25,9 @@ def load_assets():
 
 model, encoder, name_map = load_assets()
 
-# 3. UI HEADER (Using standard columns and emojis for a "Pro" look)
+# 3. UI HEADER
 st.title("⚽ Match Day Predictor")
-st.caption("AI-Powered Football Outcome Forecasting Engine")
+st.caption("AI-Powered Football Outcome Forecasting Engine with Confidence Scoring")
 st.markdown("---")
 
 if model:
@@ -36,7 +36,6 @@ if model:
     club_list = sorted(list(club_to_id.keys()))
 
     # 4. TEAM SELECTION CARDS
-    # We use st.container to group the inputs visually
     with st.container(border=True):
         col1, col2 = st.columns(2)
         
@@ -48,10 +47,9 @@ if model:
             st.markdown("### ✈️ Away")
             away_team = st.selectbox("Select Visiting Club", club_list, key="a_team")
 
-    st.write("") # Spacing
+    st.write("") 
 
-    # 5. PREDICTION BUTTON
-    # 'primary' type gives it a highlighted color automatically
+    # 5. PREDICTION ENGINE
     if st.button("RUN PREDICTION ENGINE", type="primary", use_container_width=True):
         try:
             # Conversion Logic
@@ -60,22 +58,33 @@ if model:
             h_idx = encoder.transform([h_id])[0]
             a_idx = encoder.transform([a_id])[0]
             
-            # Model Inference
+            # Model Inference (Result + Probability)
             prediction = model.predict([[h_idx, a_idx]])[0]
+            probabilities = model.predict_proba([[h_idx, a_idx]])[0]
+            
             outcomes = {1: "HOME WIN", 0: "DRAW", 2: "AWAY WIN"}
             result = outcomes[prediction]
+            
+            # Confidence Calculation
+            confidence = max(probabilities) * 100
             
             # 6. STYLED RESULT DISPLAY
             st.markdown("---")
             st.subheader("📊 Forecast Result")
             
-            # Using st.info/success/warning for "automatic" themed colors
+            # Main Result Box
             if result == "HOME WIN":
                 st.success(f"🏆 **{result}** predicted for {home_team}")
             elif result == "AWAY WIN":
                 st.info(f"🏆 **{result}** predicted for {away_team}")
             else:
                 st.warning(f"🤝 **{result}** predicted between both teams")
+            
+            # 7. CONFIDENCE METER (The Accuracy Part)
+            st.write(f"**Model Confidence:** {confidence:.1f}%")
+            st.progress(max(probabilities))
+            
+            st.caption("The confidence score represents the probability assigned by the Random Forest classifier based on historical match patterns.")
                 
         except Exception as e:
             st.error(f"Logic Error: {e}")
