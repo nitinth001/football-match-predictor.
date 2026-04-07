@@ -3,79 +3,82 @@ import joblib
 import pandas as pd
 import os
 
-# 1. Basic Page Setup (Standard & Stable)
-st.set_page_config(page_title="Football Match Predictor", page_icon="⚽")
+# 1. PAGE SETUP
+st.set_page_config(
+    page_title="Match Day Predictor",
+    page_icon="⚽",
+    layout="centered"
+)
 
-# 2. Header
-st.title("⚽ Match Outcome Predictor")
-st.markdown("---") # Simple visual separator
-
-# 3. Robust Asset Loading
-# This uses local paths to ensure it works on your PC and the Cloud.
+# 2. RELIABLE ASSET LOADING
 @st.cache_resource
 def load_assets():
-    base_path = os.path.dirname(__file__)
-    
     try:
-        model = joblib.load(os.path.join(base_path, "football_model.pkl"))
-        encoder = joblib.load(os.path.join(base_path, "club-encoder.pkl"))
-        name_map = joblib.load(os.path.join(base_path, "name_map.pkl"))
+        # Loading directly from root folder (based on your Image 6)
+        model = joblib.load("football_model.pkl")
+        encoder = joblib.load("club-encoder.pkl")
+        name_map = joblib.load("name_map.pkl")
         return model, encoder, name_map
     except Exception as e:
-        st.error(f"Error loading model files: {e}")
+        st.error(f"⚠️ Asset Error: {e}")
         return None, None, None
 
 model, encoder, name_map = load_assets()
 
-# 4. Main App Logic
-if model is not None:
-    # Prepare the dropdown list
+# 3. UI HEADER (Using standard columns and emojis for a "Pro" look)
+st.title("⚽ Match Day Predictor")
+st.caption("AI-Powered Football Outcome Forecasting Engine")
+st.markdown("---")
+
+if model:
+    # Prepare Data
     club_to_id = {name: id for id, name in name_map.items()}
     club_list = sorted(list(club_to_id.keys()))
 
-    # UI Layout - Simple Columns
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🏠 Home Team")
-        home_team = st.selectbox("Select Home Club", club_list, key="home")
+    # 4. TEAM SELECTION CARDS
+    # We use st.container to group the inputs visually
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
         
-    with col2:
-        st.subheader("✈️ Away Team")
-        away_team = st.selectbox("Select Away Club", club_list, key="away")
+        with col1:
+            st.markdown("### 🏠 Home")
+            home_team = st.selectbox("Select Host Club", club_list, key="h_team")
+            
+        with col2:
+            st.markdown("### ✈️ Away")
+            away_team = st.selectbox("Select Visiting Club", club_list, key="a_team")
 
-    st.write("") # Adds some space
-    
-    # 5. Prediction Button
-    if st.button("Predict Result", use_container_width=True):
+    st.write("") # Spacing
+
+    # 5. PREDICTION BUTTON
+    # 'primary' type gives it a highlighted color automatically
+    if st.button("RUN PREDICTION ENGINE", type="primary", use_container_width=True):
         try:
-            # Process IDs
+            # Conversion Logic
             h_id = int(club_to_id[home_team])
             a_id = int(club_to_id[away_team])
-            
-            # Encode for Model
             h_idx = encoder.transform([h_id])[0]
             a_idx = encoder.transform([a_id])[0]
             
-            # Predict
+            # Model Inference
             prediction = model.predict([[h_idx, a_idx]])[0]
-            
-            # Map Result
-            outcomes = {1: "Home Win", 0: "Draw", 2: "Away Win"}
+            outcomes = {1: "HOME WIN", 0: "DRAW", 2: "AWAY WIN"}
             result = outcomes[prediction]
             
-            # Display Result in a standard Success box
-            st.success(f"### Prediction: {result}")
+            # 6. STYLED RESULT DISPLAY
+            st.markdown("---")
+            st.subheader("📊 Forecast Result")
             
-            if result == "Home Win":
-                st.write(f"📈 The model favors **{home_team}** due to home advantage and historical stats.")
-            elif result == "Away Win":
-                st.write(f"📈 The model favors **{away_team}** based on performance metrics.")
+            # Using st.info/success/warning for "automatic" themed colors
+            if result == "HOME WIN":
+                st.success(f"🏆 **{result}** predicted for {home_team}")
+            elif result == "AWAY WIN":
+                st.info(f"🏆 **{result}** predicted for {away_team}")
             else:
-                st.write("📈 The model predicts a closely contested match ending in a **Draw**.")
-
+                st.warning(f"🤝 **{result}** predicted between both teams")
+                
         except Exception as e:
-            st.error(f"Prediction Error: {e}")
+            st.error(f"Logic Error: {e}")
 
 else:
-    st.warning("Please ensure your model files (.pkl) are in the same folder as app.py")
+    st.error("Model files not found. Please check your GitHub root directory.")
