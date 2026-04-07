@@ -10,99 +10,126 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. SAFE CSS INJECTION (Broken into chunks to fix Python 3.14 TypeError)
-def apply_styles():
-    # Base Theme
-    st.markdown("""<style>
-        [data-testid="stAppViewContainer"] { background-color: #0c0f13; font-family: 'Segoe UI', sans-serif; }
-        .stSelectbox label { color: #00f901 !important; font-weight: bold; text-transform: uppercase; }
-    </style>""", unsafe_allow_with_html=True)
+# 2. THE STYLES (Using st.html for Python 3.14 Stability)
+# We define the styles here and inject them using a more direct method.
+custom_styles = """
+<style>
+    /* Dark Theme & Typography */
+    [data-testid="stAppViewContainer"] { 
+        background-color: #0c0f13; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    }
     
-    # Header & Cards
-    st.markdown("""<style>
-        .title-wrapper {
-            background: linear-gradient(90deg, #1f2a3c, #0c0f13);
-            border-left: 10px solid #00f901;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-        div[data-testid="stColumn"] {
-            background-color: #1a1e26;
-            border: 1px solid #333;
-            border-radius: 20px;
-            padding: 25px;
-        }
-    </style>""", unsafe_allow_with_html=True)
+    /* Header Bar */
+    .header-card {
+        background: linear-gradient(90deg, #1f2a3c, #0c0f13);
+        border-left: 8px solid #00f901;
+        padding: 25px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        color: white;
+    }
 
-    # Buttons
-    st.markdown("""<style>
-        .stButton>button {
-            background-color: #00f901 !important;
-            color: black !important;
-            font-weight: 900 !important;
-            height: 3em;
-            border-radius: 50px !important;
-            text-transform: uppercase;
-        }
-        .stButton>button:hover {
-            background-color: white !important;
-            border: 2px solid #00f901 !important;
-        }
-    </style>""", unsafe_allow_with_html=True)
+    /* Input Containers */
+    div[data-testid="stColumn"] {
+        background-color: #1a1e26;
+        border: 1px solid #333;
+        border-radius: 15px;
+        padding: 25px;
+    }
 
-apply_styles()
+    /* Labels and Selectbox styling */
+    label { color: #00f901 !important; font-weight: bold !important; }
+    
+    /* Predict Button Styling */
+    .stButton > button {
+        background-color: #00f901 !important;
+        color: #000 !important;
+        font-weight: 800 !important;
+        border-radius: 30px !important;
+        border: none !important;
+        padding: 15px !important;
+        width: 100% !important;
+        text-transform: uppercase;
+        transition: 0.3s;
+    }
+    .stButton > button:hover {
+        background-color: #ffffff !important;
+        transform: scale(1.02);
+    }
+</style>
+"""
+st.html(custom_styles) # This is the "Safe" way for Python 3.14
 
 # 3. HEADER UI
-st.markdown('<div class="title-wrapper"><h1 style="color:white; margin:0;">⚽ MATCH DAY PREDICTOR</h1><p style="color:#888;">AI-Powered Statistical Analysis</p></div>', unsafe_allow_with_html=True)
+st.markdown("""
+<div class="header-card">
+    <h1 style="margin:0; font-size: 2.5rem;">⚽ MATCH DAY PREDICTOR</h1>
+    <p style="margin:0; color: #888;">AI Analysis • Prediction Engine • v1.0</p>
+</div>
+""", unsafe_allow_with_html=True)
 
-# 4. DATA LOADING
+# 4. ASSET LOADING (Robust Error Handling)
 @st.cache_resource
-def load_data():
+def load_assets():
     base = os.path.dirname(__file__)
+    files = {
+        "model": os.path.join(base, "football_model.pkl"),
+        "encoder": os.path.join(base, "club-encoder.pkl"),
+        "map": os.path.join(base, "name_map.pkl")
+    }
+    
     try:
-        model = joblib.load(os.path.join(base, "football_model.pkl"))
-        enc = joblib.load(os.path.join(base, "club-encoder.pkl"))
-        n_map = joblib.load(os.path.join(base, "name_map.pkl"))
-        return model, enc, n_map
-    except Exception as e:
-        st.error(f"Asset Load Error: {e}")
+        m = joblib.load(files["model"])
+        e = joblib.load(files["encoder"])
+        nm = joblib.load(files["map"])
+        return m, e, nm
+    except Exception as err:
+        st.error(f"⚠️ Deployment Error: Could not find model files in {base}")
         return None, None, None
 
-model, encoder, name_map = load_data()
+model, encoder, name_map = load_assets()
 
+# 5. APP LOGIC
 if model:
-    # 5. INPUTS
+    # Prepare team list
     club_to_id = {name: id for id, name in name_map.items()}
     club_list = sorted(list(club_to_id.keys()))
 
+    # Layout Columns
     col1, col2 = st.columns(2)
+    
     with col1:
-        st.markdown("### 🏠 HOME")
-        home_team = st.selectbox("Select Home Club", club_list, key="h_sel")
+        st.markdown("### 🏠 HOME TEAM")
+        home_team = st.selectbox("Choose Host", club_list, key="home_select")
+        
     with col2:
-        st.markdown("### ✈️ AWAY")
-        away_team = st.selectbox("Select Away Club", club_list, key="a_sel")
+        st.markdown("### ✈️ AWAY TEAM")
+        away_team = st.selectbox("Choose Visitor", club_list, key="away_select")
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_with_html=True)
 
-    # 6. PREDICTION
-    if st.button("CALCULATE PROBABILITY"):
+    # 6. PREDICTION TRIGGER
+    if st.button("RUN PREDICTION ENGINE"):
         try:
-            h_idx = encoder.transform([int(club_to_id[home_team])])[0]
-            a_idx = encoder.transform([int(club_to_id[away_team])])[0]
+            # Data Processing
+            h_id = int(club_to_id[home_team])
+            a_id = int(club_to_id[away_team])
+            h_idx = encoder.transform([h_id])[0]
+            a_idx = encoder.transform([a_id])[0]
             
-            pred = model.predict([[h_idx, a_idx]])[0]
+            # Inference
+            prediction = model.predict([[h_idx, a_idx]])[0]
             outcomes = {1: "HOME WIN", 0: "DRAW", 2: "AWAY WIN"}
-            res = outcomes[pred]
+            result_text = outcomes[prediction]
             
-            # Stylized Result Display
+            # Result Display
             st.markdown(f"""
-                <div style="background-color: #00f901; padding: 30px; border-radius: 15px; text-align: center;">
-                    <h1 style="color: black; margin: 0; font-size: 3rem;">{res}</h1>
-                    <p style="color: black; font-weight: bold; margin:0;">AI MODEL PREDICTION COMPLETE</p>
+                <div style="background-color: #00f901; padding: 25px; border-radius: 12px; text-align: center; margin-top: 20px;">
+                    <span style="color: black; font-weight: 900; font-size: 1.2rem;">RESULT FORECAST</span>
+                    <h1 style="color: black; margin: 0; font-size: 3.5rem;">{result_text}</h1>
                 </div>
             """, unsafe_allow_with_html=True)
             
         except Exception as e:
-            st.error(f"Prediction Error: {e}")
+            st.error(f"Prediction logic error: {e}")
